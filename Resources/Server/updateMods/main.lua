@@ -20,7 +20,7 @@ end
 
 function onInit()
 	-- get a beamng api token
-	if not api.get_token() then print("shits fucked") return end
+	if not api.get_token() then print("failed to get API key") return end
 
 	-- check all zips, excluding those in the txt
 	if FS.Exists("dontupdate.txt") then
@@ -30,7 +30,7 @@ function onInit()
 		end
 	end
 
-	--loop_mods()
+	loop_mods()
 end
 
 function loop_mods()
@@ -52,7 +52,7 @@ function check_mod(path, file)
 	else
 		zip_contents = os.capture("unzip -l " .. path)
 	end
-	tagid = string.match(zip_contents, ".+mod_info/(%g+)/info.json")
+	local tagid = string.match(zip_contents, ".+mod_info/(%g+)/info.json")
 	print(string.format("Checking mod %s (ID:%s)", file, tagid))
 
 	-- pipe json contents into string then parse it
@@ -63,15 +63,17 @@ function check_mod(path, file)
 		local_mod_info_str = os.capture(string.format("unzip -p %s mod_info/%s/info.json", path, tagid))
 	end
 	local local_mod_info = json.parse(local_mod_info_str)
-	print("\tlocal resource_version_id", local_mod_info.resource_version_id)
+	print("\tlocal  resource_version_id", local_mod_info.resource_version_id)
 
 	-- get info about mod from the API
 	local remote_mod_info = api.call('/s1/v4/getMod/'..local_mod_info.tagid)
 	print("\tremote resource_version_id", remote_mod_info.current_version_id)
 
 	if remote_mod_info.current_version_id > local_mod_info.resource_version_id then
-		print('\tmod is out of date, updating')
+		print('\tMod is out of date, updating to '..remote_mod_info.version_string)
 		update_mod(path, remote_mod_info.filename, tagid..'/'..remote_mod_info.current_version_id)
+	else
+		print('\tMod is up to date.')
 	end
 end
 
@@ -82,5 +84,10 @@ function update_mod(path, filename, version)
 	FS.Rename(path, "Resources/Client/outdated/"..filename)
 
 	-- get new mod (will possibly override filename)
-	api.get_mod(filename, version)
+	if api.get_mod(filename, version) then
+		print("\tMod update succeeded!")
+	else
+		print('\tMod download failed, reverting old version')
+		FS.Rename("Resources/Client/outdated/"..filename, path)
+	end
 end

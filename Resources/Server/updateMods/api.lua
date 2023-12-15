@@ -18,23 +18,20 @@ function api_call(endpoint, data)
 		sink = ltn12.sink.table(t)
 	})
 
-	--print(t)
-
 	local str = table.concat(t, '')
-
-	--print(headers)
 
 	if headers['content-type'] == "application/json" then
 		local parsed = json.parse(str)
-		str = parsed.data
+		str = parsed.data and parsed.data or parsed
 	end
 
 	return str, code, headers
 end
 
 function get_token()
-	resp, code, headers = http.request(host..'/s2/v4/gameauth', '{"h2":"meow"}')
-	
+	-- h2 is the magic identifier, should be kept same on the same host, I think
+	local resp, code, headers = http.request(host..'/s2/v4/gameauth', '{"h2":"'..os.time()..'"}')
+
 	if code == 200 and headers.bngstk then
 		token = headers.bngstk
 		print("received token: "..token)
@@ -45,19 +42,17 @@ function get_token()
 end
 
 function get_mod(filename, version)
+	-- get ourselves a freshly baked CDN url
 	local resp, code, headers = api_call('/s1/v4/download/mods/'..version..'/'..filename)
 
-	print('CDN url: '..headers.location)
+	print('\tCDN url: '..headers.location)
 
-
+	-- download it with ltn12 to the Client folder
         local success, code, headers, status_line = http.request({
                 url = headers.location,
                 sink = ltn12.sink.file(io.open("Resources/Client/"..filename, 'w+'))
         })
-
-	print(success, code, status_line)
-
-
+	return success
 end
 
 
@@ -66,4 +61,3 @@ M.call = api_call
 M.get_mod = get_mod
 
 return M
-
